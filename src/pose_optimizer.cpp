@@ -9,7 +9,8 @@ namespace pe {
 PoseOptimizer::PoseOptimizer(const CameraIntrinsics& K,
                              const Model3D& model,
                              const PipelineConfig& cfg)
-    : cfg_(cfg), matcher_(K, model, cfg) {}
+    : cfg_(cfg), matcher_(K, model, cfg) {
+}
 
 // ── Начальный симплекс ────────────────────────────────────────────────────
 
@@ -108,6 +109,7 @@ void PoseOptimizer::nelderMead(OptResult &result, const PoseVec& x0, const Score
         }
         auto t3 = std::chrono::high_resolution_clock::now();
         std::cout << "[nelderMead] iter " << result.iterations << " time =" << ms(t2, t3) << "ms; score = " << fval[0] << "; spread = " << spread << " \n";
+        std::cout << "cfg_.init_step_t = " << cfg_.init_step_t << "; cfg_.init_step_r = " << cfg_.init_step_r << "\n";
         ++result.iterations;
     }
     auto t6 = std::chrono::high_resolution_clock::now();

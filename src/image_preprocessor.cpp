@@ -61,6 +61,7 @@ ImagePreprocessor::Result ImagePreprocessor::process(const cv::Mat& frame) const
                   static_cast<double>(cfg_.chamfer_trunc),
                   static_cast<double>(cfg_.chamfer_trunc),
                   cv::THRESH_TRUNC);
+    //cv::imshow("edges", edges);
     return {edges, dt, dt_trunc};
 }
 

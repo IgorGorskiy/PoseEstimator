@@ -85,8 +85,8 @@ cv::Mat Pipeline::renderPoseDebug(const cv::Mat& background,
     // Подсчёт видимых рёбер
     float vr = 0;
     auto prep = preprocessor_.process(background);
-    matcher_.score(pose, prep, &vr);
-
+    auto score = matcher_.score(pose, prep, &vr);
+    std::cout << "DEBUG POSE SCORE = " << score << "\n";
     char buf2[64];
     std::snprintf(buf2, sizeof(buf2), "VisibleEdges=%.1f%%", vr * 100.f);
     cv::putText(vis, buf2, {10, 70},
@@ -146,7 +146,7 @@ PoseEstimate Pipeline::coldStart(const ImagePreprocessor::Result& prep, double t
         // }
 
         PipelineConfig cfg_local = cfg_;
-        cfg_local.init_step_t   = 0.005;
+        cfg_local.init_step_t   = 0.05;
         cfg_local.init_step_r   = 0.02;
         cfg_local.max_iterations = 500;
         PoseOptimizer opt_local(K_, model_, cfg_local);
@@ -231,8 +231,8 @@ PoseEstimate Pipeline::track(const ImagePreprocessor::Result& prep, double ts)
 
     // Локальная оптимизация (малый диапазон)
     PipelineConfig localCfg = cfg_;
-    localCfg.init_step_t = 0.002;
-    localCfg.init_step_r = 0.01;
+    //localCfg.init_step_t = 0.02;
+    //localCfg.init_step_r = 0.01;
 
     PoseOptimizer localOpt(K_, model_, localCfg);
     auto res = localOpt.optimize(predicted, prep);

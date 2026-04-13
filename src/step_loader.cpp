@@ -87,7 +87,7 @@ std::vector<Vec3d> tessellateEdge(const TopoDS_Edge& edge, double deflection)
 
 } // anonymous namespace
 
-Model3D loadStep(const std::string& path, double deflection, double sharpAngleDeg)
+Model3D loadStep(const std::string& path, double linerDeflection, double angDeflection, double sharpAngleDeg)
 {
     std::cout << "[StepLoader] Loading: " << path << "\n";
 
@@ -101,8 +101,10 @@ Model3D loadStep(const std::string& path, double deflection, double sharpAngleDe
         throw std::runtime_error("STEP file produced empty shape");
 
     std::cout << "[StepLoader] Meshing...\n";
-    BRepMesh_IncrementalMesh mesh(shape, deflection, Standard_False,
-                                  0.5 * M_PI / 180.0, Standard_True);
+    // BRepMesh_IncrementalMesh mesh(shape, deflection, Standard_False,
+    //                               0.5 * M_PI / 180.0, Standard_True);
+    BRepMesh_IncrementalMesh mesh(shape, linerDeflection, Standard_False,
+        angDeflection * M_PI / 180.0, Standard_True);
     mesh.Perform();
 
     TopTools_IndexedDataMapOfShapeListOfShape edgeFaceMap;
@@ -117,7 +119,7 @@ Model3D loadStep(const std::string& path, double deflection, double sharpAngleDe
         const TopoDS_Edge& edge = TopoDS::Edge(exp.Current());
         if (BRep_Tool::Degenerated(edge)) continue;
 
-        auto pts = tessellateEdge(edge, deflection);
+        auto pts = tessellateEdge(edge, linerDeflection);
         if (pts.size() < 2) continue;
 
         // мм → м
@@ -125,7 +127,7 @@ Model3D loadStep(const std::string& path, double deflection, double sharpAngleDe
 
         double angleDeg = edgeSharpnessAngle(edge, edgeFaceMap);
         bool sharp = (angleDeg > sharpAngleDeg);
-        model.edges.push_back({std::move(pts), sharp});
+        model.edges.push_back({ std::move(pts), sharp });
         ++edgeCount;
     }
 
@@ -138,7 +140,7 @@ Model3D loadStep(const std::string& path, double deflection, double sharpAngleDe
         if (tri.IsNull()) continue;
 
         // Матрица преобразования грани в глобальные координаты
-        const gp_Trsf& trsf = loc.IsIdentity() ? gp_Trsf() : loc.IsIdentity() ? gp_Trsf() : loc;
+        const gp_Trsf& trsf = loc.IsIdentity() ? gp_Trsf() : (gp_Trsf)loc;
         bool reversed = (face.Orientation() == TopAbs_REVERSED);
 
         for (int i = 1; i <= tri->NbTriangles(); ++i) {
@@ -151,7 +153,7 @@ Model3D loadStep(const std::string& path, double deflection, double sharpAngleDe
                 return Vec3d(p.X(), p.Y(), p.Z()) * MM2M;
             };
 
-            model.faces.push_back({getVtx(n1), getVtx(n2), getVtx(n3)});
+            model.faces.push_back({ getVtx(n1), getVtx(n2), getVtx(n3) });
             ++faceCount;
         }
     }
@@ -159,16 +161,16 @@ Model3D loadStep(const std::string& path, double deflection, double sharpAngleDe
     // ── BBox ─────────────────────────────────────────────────────────────
     Bnd_Box bbox;
     BRepBndLib::Add(shape, bbox);
-    double x0,y0,z0, x1,y1,z1;
-    bbox.Get(x0,y0,z0, x1,y1,z1);
-    model.bbox_min = Vec3d{x0,y0,z0} * MM2M;
-    model.bbox_max = Vec3d{x1,y1,z1} * MM2M;
+    double x0, y0, z0, x1, y1, z1;
+    bbox.Get(x0, y0, z0, x1, y1, z1);
+    model.bbox_min = Vec3d{ x0,y0,z0 } *MM2M;
+    model.bbox_max = Vec3d{ x1,y1,z1 } *MM2M;
     model.centroid = (model.bbox_min + model.bbox_max) * 0.5;
 
     std::cout << "[StepLoader] Done. Edges: " << edgeCount
-              << "  Faces: " << faceCount
-              << "  BBox: [" << x0 << "," << y0 << "," << z0
-              << "] - [" << x1 << "," << y1 << "," << z1 << "]\n";
+        << "  Faces: " << faceCount
+        << "  BBox: [" << x0 << "," << y0 << "," << z0
+        << "] - [" << x1 << "," << y1 << "," << z1 << "]\n";
     return model;
 }
 

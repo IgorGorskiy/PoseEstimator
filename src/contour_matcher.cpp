@@ -39,9 +39,10 @@ double ContourMatcher::score(const SE3& pose,
             for (int x = 0; x < W; x++) {
                 p.x = x;
                 p.y = y;
-                if (contours.at<uchar>(p) == 255)
+                if (contours.at<uchar>(p) == 255) {
                     sumDist += static_cast<double>(dt.at<float>(p));
-                ++count;
+                    ++count;
+                }
             }
         }
     }

@@ -15,7 +15,7 @@ namespace pe {
 /// \param deflection    линейное отклонение тесселяции (м), влияет на кол-во точек
 /// \param sharpAngleDeg угол в градусах для классификации рёбер
 Model3D loadStep(const std::string& path,
-                 double deflection    = 30.0,
-                 double sharpAngleDeg = 30.0);
+    double linerDeflection = 0.1, double angDeflection = 30,
+    double sharpAngleDeg = 10.0);
 
 } // namespace pe
