@@ -8,7 +8,7 @@
 namespace pe {
 
 Pipeline::Pipeline(const std::string& stepPath,
-                   const CameraIntrinsics& K,
+                   CameraIntrinsics& K,
                    const PipelineConfig& cfg)
     : K_(K)
     , cfg_(cfg)
@@ -234,11 +234,10 @@ PoseEstimate Pipeline::track(const ImagePreprocessor::Result& prep, double ts)
     //localCfg.init_step_t = 0.02;
     //localCfg.init_step_r = 0.01;
 
-    PoseOptimizer localOpt(K_, model_, localCfg);
+    static PoseOptimizer localOpt(K_, model_, localCfg);
     auto res = localOpt.optimize(predicted, prep);
 
     float vr;
-    matcher_.score(res.pose, prep, &vr);
 
     PoseEstimate est;
     est.timestamp = ts;
@@ -251,6 +250,11 @@ PoseEstimate Pipeline::track(const ImagePreprocessor::Result& prep, double ts)
     if (trackOk) {
         SE3 filtered = filter_.update(res.pose, res.score, ts);
         est.pose  = cfg_.use_kalman ? filtered : res.pose;
+        auto poseV = se3ToPoseVec(est.pose);
+        std::cout << "[Pipeline] Track pose: [ " << poseV[0];
+        for (int i = 1; i < 6; i++)
+            std::cout << "; " << poseV[i];
+        std::cout << " ]\n";
         est.valid = true;
         lostCount_ = 0;
     } else {
@@ -266,7 +270,13 @@ PoseEstimate Pipeline::track(const ImagePreprocessor::Result& prep, double ts)
             mode_ = Mode::COLD_START;
         }
     }
+    PoseVec estV = se3ToPoseVec(est.pose);
+    PoseVec lastestV = se3ToPoseVec(lastEstimate_.pose);
+    auto shift = estV - lastestV;
+    std::cout << "[pipenline] End of processing frame. Pose shift: x=" << shift[0] << " y=" << shift[1] << " z=" << shift[2]
+        << " a=" << shift[3] << " b=" << shift[4] << " c=" << shift[5] << "\n";
     lastEstimate_ = est;
+    getchar();
     return est;
 }
 

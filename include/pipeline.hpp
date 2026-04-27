@@ -37,7 +37,7 @@ public:
     )>;
 
     Pipeline(const std::string& stepPath,
-             const CameraIntrinsics& K,
+             CameraIntrinsics& K,
              const PipelineConfig& cfg);
 
     /// Запуск обработки видео из файла или камеры

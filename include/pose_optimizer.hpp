@@ -18,7 +18,7 @@ namespace pe {
 
 class PoseOptimizer {
 public:
-    PoseOptimizer(const CameraIntrinsics& K,
+    PoseOptimizer(CameraIntrinsics& K,
                   const Model3D& model,
                   const PipelineConfig& cfg);
 
@@ -45,7 +45,7 @@ private:
     PipelineConfig   cfg_;
     ContourMatcher   matcher_;
 
-    using ScoreFn = std::function<double(const PoseVec&)>;
+    using ScoreFn = std::function<double(const PoseVec&, int div)>;
 
     // Nelder–Mead по 6D
     void nelderMead(OptResult& result, const PoseVec& x0, const ScoreFn& f,

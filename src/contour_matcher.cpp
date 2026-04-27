@@ -7,10 +7,12 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/videoio.hpp>
 #include <conio.h>
+#include <numeric>
+#include <vector>
 
 namespace pe {
 
-ContourMatcher::ContourMatcher(const CameraIntrinsics& K,
+ContourMatcher::ContourMatcher(CameraIntrinsics& K,
                                const Model3D& model,
                                const PipelineConfig& cfg)
     : K_(K), model_(model), cfg_(cfg), renderer_(K, model) {}
@@ -19,7 +21,8 @@ ContourMatcher::ContourMatcher(const CameraIntrinsics& K,
 
 double ContourMatcher::score(const SE3& pose,
                              const ImagePreprocessor::Result& prep,
-                             float* visibleRatio) const
+                             float* visibleRatio,
+                             int div) const
 {
     const cv::Mat& dt = prep.dt_trunc;   // CV_32F, усечённый DT
     const int W = dt.cols, H = dt.rows;
@@ -29,24 +32,59 @@ double ContourMatcher::score(const SE3& pose,
     //    return 1000;
     //}
     double sumDist = 0.0;
+    float result = 0.0;
     int    count = 0;
     bool gpu = true;
     if (gpu) {
+        double d;
         cv::Mat contours;
-        renderer_.render(pose, contours, 1);
+        renderer_.render(pose, contours, 1, (float)div);
         cv::Point2i p;
-        for (int y = 0; y < H; y++) {
-            for (int x = 0; x < W; x++) {
-                p.x = x;
-                p.y = y;
+        cv::Point2i pdt;
+        int divcorrection = div / 2;
+        if (div == 1)
+            divcorrection = 0;
+        for (int y = 0; y < H/div; y++) {
+            for (int x = 0; x < W/div; x++) {
+                p.x = x; pdt.x = x * div + divcorrection;
+                p.y = y; pdt.y = y * div + divcorrection;
                 if (contours.at<uchar>(p) == 255) {
-                    sumDist += static_cast<double>(dt.at<float>(p));
+                    d = cfg_.chamfer_trunc - static_cast<double>(dt.at<float>(pdt));
+                    sumDist += d*d*d;
                     ++count;
                 }
             }
         }
+        result = -sumDist / count;
+
+
+        //int div = 2;
+        //std::vector<float> distances;
+        //for (int yy = 0; yy < div; yy++) {
+        //    for (int xx = 0; xx < div; xx++) {
+        //        int sectorCount = 0;
+        //        int sectorDist = 0;
+        //        for (int y = yy * H / div; y < (yy+1) * H / div; y++) {
+        //            for (int x = xx * W / div; x < (xx + 1) * W / div; x++) {
+        //                p.x = x;
+        //                p.y = y;
+        //                if (contours.at<uchar>(p) == 255) {
+        //                    d = cfg_.chamfer_trunc - static_cast<double>(dt.at<float>(p));
+        //                    sectorDist += d * d;
+        //                    ++count;
+        //                    ++sectorCount;
+        //                }
+        //            }
+        //        }
+        //        if (sectorCount >= 200)
+        //            distances.push_back((sectorDist / sectorCount)*(sectorDist / sectorCount));
+        //    }
+        //}
+        //float sum = std::accumulate(distances.begin(), distances.end(), 0);
+        //result = -sum / distances.size();
     }
     else {
+        std::cout << "CPU RENDER\n";
         float vr = 0.f;
         auto polys = renderer_.project(pose, &vr);
 
@@ -62,9 +100,10 @@ double ContourMatcher::score(const SE3& pose,
                 ++count;
             }
         }
+        result = -sumDist / count;
     }
     if (count == 0) return static_cast<double>(cfg_.chamfer_trunc);
-    return sumDist / count;
+    return result;
 }
 
 // ── Выборка точек вдоль полилинии ────────────────────────────────────────

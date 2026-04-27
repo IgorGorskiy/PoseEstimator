@@ -10,12 +10,12 @@ class CudaRenderer;
 
 class ModelRenderer {
 public:
-    ModelRenderer(const CameraIntrinsics& K, const Model3D& model);
+    ModelRenderer(CameraIntrinsics& K, const Model3D& model);
     ~ModelRenderer();
 
     /// Рендер рёбер с Z-тестом.
     /// Vulkan если доступен, иначе CPU-fallback (программный Z-буфер).
-    void render(const SE3& pose, cv::Mat& out, int thickness = 3) const;
+    void render(const SE3& pose, cv::Mat& out, int thickness = 3, float div = 1) const;
 
     /// Проекция рёбер в 2D полилинии для TCD метрики.
     /// Всегда CPU — оптимизатор читает координаты точек, не пиксели.

@@ -12,7 +12,7 @@ set(CUDAToolkit_ROOT "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8" 
 
 project(pose_estimator_gpu VERSION 1.0.0 LANGUAGES CXX CUDA)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_STANDARD 17)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
@@ -32,6 +32,13 @@ set(OpenCV_DIR "C:/vcpkg/installed/x64-windows/share/opencv4")
 # Временно отключаем FORCE-кэш vcpkg
 unset(OpenCV_DIR CACHE)
 set(OpenCV_DIR "C:/vcpkg/installed/x64-windows/share/opencv4" CACHE PATH "" FORCE)
+
+find_package(Vulkan REQUIRED)
+#find_package(Vulkan REQUIRED COMPONENTS shaderc_combined)
+#find_package(shaderc REQUIRED)
+find_package(glslang REQUIRED)
+find_package(glm REQUIRED)
+
 
 find_package(OpenCV 4.5 REQUIRED COMPONENTS core imgproc highgui videoio calib3d)
 
@@ -73,6 +80,7 @@ set(CXX_SOURCES
     src/pose_optimizer.cpp
     src/pose_filter.cpp
     src/pipeline.cpp
+    src/vk.cpp
 )
 
 set(CUDA_SOURCES
@@ -80,6 +88,7 @@ set(CUDA_SOURCES
 )
 
 add_executable(${PROJECT_NAME} ${CXX_SOURCES} ${CUDA_SOURCES})
+target_compile_definitions(${PROJECT_NAME} PUBLIC GLM_FORCE_DEPTH_ZERO_TO_ONE)
 
 # CUDA-файлы компилируются nvcc, C++-файлы — MSVC/GCC
 set_source_files_properties(${CUDA_SOURCES} PROPERTIES LANGUAGE CUDA)
@@ -103,6 +112,17 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     yaml-cpp
     CUDA::cudart
 )
+
+target_link_libraries(${PROJECT_NAME} PRIVATE Vulkan::Vulkan)
+#target_link_libraries(${PROJECT_NAME} PRIVATE Vulkan::shaderc_combined)
+#target_link_libraries(${PROJECT_NAME} PRIVATE shaderc::shaderc_shared)
+target_link_libraries(${PROJECT_NAME} PRIVATE 
+    Vulkan::Vulkan 
+    "C:/VulkanSDK/1.4.341.1/Lib/shaderc_shared.lib"
+)
+target_link_libraries(${PROJECT_NAME} PRIVATE glslang::glslang glslang::SPIRV)
+target_link_libraries(${PROJECT_NAME} PRIVATE glm::glm)
+target_include_directories(${PROJECT_NAME} PRIVATE ${Vulkan_INCLUDE_DIRS})
 
 # ── Флаги компилятора ────────────────────────────────────────────────────────
 if(MSVC)

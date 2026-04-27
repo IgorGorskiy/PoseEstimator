@@ -16,7 +16,7 @@ namespace pe {
 /// перекрытие крепёжными изделиями).
 class ContourMatcher {
 public:
-    ContourMatcher(const CameraIntrinsics& K,
+    ContourMatcher(CameraIntrinsics& K,
                    const Model3D& model,
                    const PipelineConfig& cfg);
 
@@ -26,7 +26,8 @@ public:
     /// \param visibleRatio  доля видимых рёбер [0..1]
     double score(const SE3& pose,
                  const ImagePreprocessor::Result& prep,
-                 float* visibleRatio = nullptr) const;
+                 float* visibleRatio = nullptr,
+                 int div = 1) const;
 
     /// Многомасштабный поиск: сначала на уменьшенном изображении, потом уточнение
     //OptResult pyramidSearch(const ImagePreprocessor::Result& prep,

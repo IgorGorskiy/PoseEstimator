@@ -352,11 +352,11 @@ struct CudaRenderer::Impl {
     }
 
     // Собираем GpuCamera и GpuPose из текущих параметров
-    GpuCamera makeCamera() const {
+    GpuCamera makeCamera(float div) const {
         GpuCamera c;
-        c.fx = float(K.fx); c.fy = float(K.fy);
-        c.cx = float(K.cx); c.cy = float(K.cy);
-        c.width = K.width;  c.height = K.height;
+        c.fx = float(K.fx) / div; c.fy = float(K.fy) / div;
+        c.cx = float(K.cx) / div; c.cy = float(K.cy) / div;
+        c.width = K.width / div;  c.height = K.height / div;
         c.k1 = float(K.distCoeffs[0]); c.k2 = float(K.distCoeffs[1]);
         c.p1 = float(K.distCoeffs[2]); c.p2 = float(K.distCoeffs[3]);
         c.k3 = float(K.distCoeffs[4]);
@@ -375,11 +375,11 @@ struct CudaRenderer::Impl {
         return p;
     }
 
-    cv::Mat renderEdgeMask(const SE3& pose, int thickness) {
+    cv::Mat renderEdgeMask(const SE3& pose, int thickness, float div) {
 
-        int W = K.width, H = K.height, N = W*H;
+        int W = K.width / div, H = K.height / div, N = W*H;
 
-        GpuCamera cam  = makeCamera();
+        GpuCamera cam  = makeCamera(div);
         GpuPose   gp   = makePose(pose);
 
         // Очищаем буферы
@@ -395,7 +395,6 @@ struct CudaRenderer::Impl {
         d_tris, numTris, cam, gp, d_zbuf);
     cudaDeviceSynchronize();
 }
-
         // ── Pass 2: рёбра + Z-тест → маска ────────────────────────────────
         if (numSegs > 0) {
             int grid = (numSegs + BLOCK-1) / BLOCK;
@@ -416,7 +415,7 @@ struct CudaRenderer::Impl {
 
 // ── Публичный интерфейс ───────────────────────────────────────────────────
 
-CudaRenderer::CudaRenderer(const CameraIntrinsics& K) {
+CudaRenderer::CudaRenderer(CameraIntrinsics& K) {
     int devCount = 0;
     cudaError_t err = cudaGetDeviceCount(&devCount);
     if (err != cudaSuccess || devCount == 0) {
@@ -449,9 +448,9 @@ void CudaRenderer::setCamera(const CameraIntrinsics& K) {
     impl_->allocFrameBuffers();
 }
 
-cv::Mat CudaRenderer::renderEdgeMask(const SE3& pose, int thickness) {
+cv::Mat CudaRenderer::renderEdgeMask(const SE3& pose, int thickness, float div) {
     if (!impl_) return {};
-    return impl_->renderEdgeMask(pose, thickness);
+    return impl_->renderEdgeMask(pose, thickness, div);
 }
 
 } // namespace pe

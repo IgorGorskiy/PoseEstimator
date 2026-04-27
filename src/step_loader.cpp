@@ -94,7 +94,6 @@ Model3D loadStep(const std::string& path, double linerDeflection, double angDefl
     STEPControl_Reader reader;
     if (reader.ReadFile(path.c_str()) != IFSelect_RetDone)
         throw std::runtime_error("Failed to read STEP file: " + path);
-
     reader.TransferRoots();
     TopoDS_Shape shape = reader.OneShape();
     if (shape.IsNull())

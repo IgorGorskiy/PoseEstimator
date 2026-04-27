@@ -18,7 +18,7 @@ namespace pe {
 
 class CudaRenderer {
 public:
-    explicit CudaRenderer(const CameraIntrinsics& K);
+    explicit CudaRenderer(CameraIntrinsics& K);
     ~CudaRenderer();
 
     CudaRenderer(const CudaRenderer&)            = delete;
@@ -31,7 +31,7 @@ public:
     void setCamera(const CameraIntrinsics& K);
 
     // Рендер. Возвращает CV_8UC1 маску рёбер на CPU.
-    cv::Mat renderEdgeMask(const SE3& pose, int thickness = 1);
+    cv::Mat renderEdgeMask(const SE3& pose, int thickness = 1, float div = 1);
 
     bool isValid() const { return valid_; }
 

@@ -3,6 +3,7 @@
 #include <opencv2/imgproc.hpp>
 #include <opencv2/videoio.hpp>
 #include <opencv2/highgui.hpp>
+#include "vk.hpp"
 #include <iostream>
 #include <limits>
 #include <cmath>
@@ -10,7 +11,7 @@
 namespace pe {
     extern int firstframeINT;
 
-ModelRenderer::ModelRenderer(const CameraIntrinsics& K, const Model3D& model)
+ModelRenderer::ModelRenderer(CameraIntrinsics& K, const Model3D& model)
     : K_(K), model_(model)
 {
     cuda_ = std::make_unique<CudaRenderer>(K);
@@ -46,9 +47,9 @@ static bool clipNear(Vec3d& A, Vec3d& B, double n) {
 
 // ── render() ──────────────────────────────────────────────────────────────
 
-void ModelRenderer::render(const SE3& pose, cv::Mat& out, int thickness) const {
+void ModelRenderer::render(const SE3& pose, cv::Mat& out, int thickness, float div) const {
     if (cuda_ && cuda_->isValid()) {
-        out = cuda_->renderEdgeMask(pose, thickness);
+        out = cuda_->renderEdgeMask(pose, thickness, div);
         return;
     }
     // CPU fallback
