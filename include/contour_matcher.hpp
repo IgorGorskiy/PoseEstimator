@@ -24,6 +24,7 @@ public:
     /// \param pose          предполагаемая поза T_cam_model
     /// \param prep          результат предобработки текущего кадра
     /// \param visibleRatio  доля видимых рёбер [0..1]
+    double computeRadialInertiaDT(const cv::Mat& dt, const cv::Mat& render) const;
     double score(const SE3& pose,
                  const ImagePreprocessor::Result& prep,
                  float* visibleRatio = nullptr,

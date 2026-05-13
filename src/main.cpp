@@ -24,6 +24,7 @@
 #include <opencv2/core/cuda.hpp>
 #include <cuda_runtime.h>
 #include <numbers>
+#include <windows.h>
 
 pe::CameraIntrinsics loadCamera(const YAML::Node& n) {
     pe::CameraIntrinsics K;
@@ -258,7 +259,7 @@ CameraPose poseToCamera(const pe::SE3& pose) {
 }
 
 int main(int argc, char* argv[]) {
-    VK::set_resolution(1920, 1920);
+    VK::set_resolution(1920, 1080);
     VK::init();
     VK::set_line_width(2.0f);
     pe::Model3D model = pe::loadStep("robot2.STEP");
@@ -283,6 +284,8 @@ int main(int argc, char* argv[]) {
     cv::Mat img;
 
     setlocale(LC_ALL, "");
+    SetConsoleOutputCP(CP_UTF8);
+    SetConsoleCP(CP_UTF8);
     std::string argvv[4];
     if (argc < 4) {
         std::cout << "Usage: pose_estimator <config.yaml> <model.step> <video>\n";
@@ -319,7 +322,16 @@ std::cout << "isOpened: " << cap.isOpened() << "\n";
     auto K        = loadCamera(yaml["camera"]);
     auto cfg      = loadConfig(yaml["pipeline"]);
     auto initPose = loadInitialPose(yaml["pipeline"]);
+    Eigen::Vector3d pose_t;
+    Eigen::Vector3d pose_r;
+    poseToSwParams(initPose.value(), pose_t, pose_r);
     auto VP = loadInitialPoseVulcanVector(yaml["pipeline"]);
+    VP[0] = -pose_t[0]/1000;
+    VP[1] = pose_t[1] / 1000;
+    VP[2] = -pose_t[2] / 1000;
+    VP[3] = pose_r[0] + 3;
+    VP[4] = -pose_r[2];
+    VP[5] = pose_r[1];
 
     auto ms = [](auto a, auto b) {
         return std::chrono::duration<double, std::milli>(b - a).count();
@@ -329,11 +341,20 @@ std::cout << "isOpened: " << cap.isOpened() << "\n";
         VP[0], VP[1], VP[2],
         VP[3], VP[4], VP[5]
     );
+    img = VK::draw(
+        VP[0], VP[1], VP[2],
+        VP[3], VP[4], VP[5]
+    );
+    img = VK::draw(
+        VP[0], VP[1], VP[2],
+        VP[3], VP[4], VP[5]
+    );
+    img = VK::draw(
+        VP[0], VP[1], VP[2],
+        VP[3], VP[4], VP[5]
+    );
     auto t1 = std::chrono::high_resolution_clock::now();
-    cv::Mat dst;
-    cv::cvtColor(img, dst, cv::COLOR_BGRA2GRAY);
-    cv::Rect roi(0, 420, 1920, 1080);
-    cv::Mat dst2 = dst(roi);
+    cv::Mat dst2 = img;
 
     std::cout << "[VULCAN] time =" << ms(t0, t1) << " ms\n";
 
@@ -356,7 +377,7 @@ std::cout << "isOpened: " << cap.isOpened() << "\n";
             if (opened) { cap.read(firstFrame); cap.release(); }
 
             cv::Mat render = pipeline.renderPoseDebug(
-                firstFrame, initPose.value(), "SW initial pose");
+                img, initPose.value(), "SW initial pose");
             cv::imshow("Initial Pose Check (any key = continue, ESC = exit)", render);
             cv::imwrite("debug_initial_pose.png", render);
             std::cout << "Saved: debug_initial_pose.png\n\n";

@@ -130,21 +130,6 @@ PoseEstimate Pipeline::coldStart(const ImagePreprocessor::Result& prep, double t
         std::vector<SE3> candidates;
         candidates.push_back(initP);
 
-        // ВАРИАЦИИ ИДУТ НАХУЙ, Я ЗАЕБАЛСЯ ЖДАТЬ ПОКА ЭТО ГОВНО ИСПОЛНЯЕТСЯ!!!!
-        // Вариации ±5 см по трансляции и ±10° по вращению
-        // for (int i = 0; i < 3; ++i) {
-        //     for (double dv : {-0.05, 0.05}) {
-        //         PoseVec v = base; v(i) += dv;
-        //         candidates.push_back(poseVecToSE3(v));
-        //     }
-        // }
-        // for (int i = 3; i < 6; ++i) {
-        //     for (double dv : {-0.17, 0.17}) {  // ~10 deg
-        //         PoseVec v = base; v(i) += dv;
-        //         candidates.push_back(poseVecToSE3(v));
-        //     }
-        // }
-
         PipelineConfig cfg_local = cfg_;
         cfg_local.init_step_t   = 0.05;
         cfg_local.init_step_r   = 0.02;
@@ -246,7 +231,7 @@ PoseEstimate Pipeline::track(const ImagePreprocessor::Result& prep, double ts)
     // НА ГПУ vr НЕ СЧИТАЕТСЯ
     bool trackOk = (res.score < trackLossThreshold_);// &&
                    //(vr >= cfg_.min_visible_ratio);
-
+    trackOk = true;
     if (trackOk) {
         SE3 filtered = filter_.update(res.pose, res.score, ts);
         est.pose  = cfg_.use_kalman ? filtered : res.pose;
@@ -276,7 +261,6 @@ PoseEstimate Pipeline::track(const ImagePreprocessor::Result& prep, double ts)
     std::cout << "[pipenline] End of processing frame. Pose shift: x=" << shift[0] << " y=" << shift[1] << " z=" << shift[2]
         << " a=" << shift[3] << " b=" << shift[4] << " c=" << shift[5] << "\n";
     lastEstimate_ = est;
-    getchar();
     return est;
 }
 

@@ -17,6 +17,117 @@ ContourMatcher::ContourMatcher(CameraIntrinsics& K,
                                const PipelineConfig& cfg)
     : K_(K), model_(model), cfg_(cfg), renderer_(K, model) {}
 
+double computeRadialInertia(const cv::Mat& img1, const cv::Mat& img2)
+{
+    CV_Assert(img1.size() == img2.size());
+    CV_Assert(img1.type() == CV_8UC1 && img2.type() == CV_8UC1);
+
+    // 1. Пересечение контуров
+    cv::Mat intersection;
+    cv::bitwise_and(img1, img2, intersection);
+
+    // 2. Поиск центра масс
+    double sumX = 0.0, sumY = 0.0;
+    int count = 0;
+
+    for (int y = 0; y < intersection.rows; ++y)
+    {
+        const uchar* row = intersection.ptr<uchar>(y);
+        for (int x = 0; x < intersection.cols; ++x)
+        {
+            if (row[x] == 255)
+            {
+                sumX += x;
+                sumY += y;
+                count++;
+            }
+        }
+    }
+
+    if (count == 0)
+        return 0.0; // нет пересечения
+
+    double cx = sumX / count;
+    double cy = sumY / count;
+
+    // 3. Радиальный момент инерции
+    double inertia = 0.0;
+
+    for (int y = 0; y < intersection.rows; ++y)
+    {
+        const uchar* row = intersection.ptr<uchar>(y);
+        for (int x = 0; x < intersection.cols; ++x)
+        {
+            if (row[x] == 255)
+            {
+                double dx = x - cx;
+                double dy = y - cy;
+                inertia += dx * dx + dy * dy;
+            }
+        }
+    }
+    return sqrt(inertia);
+}
+
+double ContourMatcher::computeRadialInertiaDT(const cv::Mat& dt, const cv::Mat& render) const
+{
+    static bool first = true;
+    cv::Mat err = cv::Mat::zeros(K_.height, K_.width, CV_8UC1);
+    // 2. Поиск центра масс
+    double sumX = 0.0, sumY = 0.0;
+    int count = 0;
+
+    for (int y = 0; y < render.rows; ++y)
+    {
+        const uchar* row = render.ptr<uchar>(y);
+        for (int x = 0; x < render.cols; ++x)
+        {
+            if (row[x] == 255)
+            {
+                sumX += x;
+                sumY += y;
+                count++;
+            }
+        }
+    }
+
+    if (count == 0)
+        return 0.0; // нет пересечения
+
+    double cx = sumX / count;
+    double cy = sumY / count;
+
+    // 3. Радиальный момент инерции
+    double inertia = 0.0;
+    double inertiaMat[2][2] = { 0,0, 0,0 };
+    cv::Point2i p;
+    for (int y = 0; y < dt.rows; ++y)
+    {
+        const float* row = dt.ptr<float>(y);
+        for (int x = 0; x < dt.cols; ++x)
+        {
+            p.x = x; p.y = y;
+            if (first)
+                err.at<uchar>(p) = 0;
+            if (render.at<uchar>(p) == 255) {
+                double dist = (double)cfg_.chamfer_trunc - (double)row[x];
+                double dx = x - cx;
+                double dy = y - cy;
+                //inertia += (dx * dx + dy * dy) * dist;
+                int secX = x < (dt.cols / 2) ? 0 : 1;
+                int secY = y < (dt.rows / 2) ? 0 : 1;
+                inertiaMat[secX][secY] += (dx * dx + dy * dy) * dist;
+                if (first)
+                    err.at<uchar>(p) = (uchar)dist*40;
+            }
+        }
+    }
+    inertia = inertiaMat[0][0] * inertiaMat[0][1] * inertiaMat[1][0] * inertiaMat[1][1];
+    if (first)
+        cv::imwrite("err.png", err);
+    return sqrt(inertia);
+}
+
 // ── Вычисление Truncated Chamfer Distance ────────────────────────────────
 
 double ContourMatcher::score(const SE3& pose,
@@ -25,6 +136,7 @@ double ContourMatcher::score(const SE3& pose,
                              int div) const
 {
     const cv::Mat& dt = prep.dt_trunc;   // CV_32F, усечённый DT
+    const cv::Mat& ed = prep.edges;
     const int W = dt.cols, H = dt.rows;
     //if (H != K_.height || W != K_.width) {
     //    std::cout << "H = " << H << "; K_.height = " << K_.height << "; W = " << W << "; K_.width = " << K_.width << "\n";
@@ -38,50 +150,28 @@ double ContourMatcher::score(const SE3& pose,
     if (gpu) {
         double d;
         cv::Mat contours;
-        renderer_.render(pose, contours, 1, (float)div);
-        cv::Point2i p;
-        cv::Point2i pdt;
-        int divcorrection = div / 2;
-        if (div == 1)
-            divcorrection = 0;
-        for (int y = 0; y < H/div; y++) {
-            for (int x = 0; x < W/div; x++) {
-                p.x = x; pdt.x = x * div + divcorrection;
-                p.y = y; pdt.y = y * div + divcorrection;
-                if (contours.at<uchar>(p) == 255) {
-                    d = cfg_.chamfer_trunc - static_cast<double>(dt.at<float>(pdt));
-                    sumDist += d*d*d;
-                    ++count;
-                }
-            }
-        }
-        result = -sumDist / count;
-
-
-        //int div = 2;
-        //std::vector<float> distances;
-        //for (int yy = 0; yy < div; yy++) {
-        //    for (int xx = 0; xx < div; xx++) {
-        //        int sectorCount = 0;
-        //        int sectorDist = 0;
-        //        for (int y = yy * H / div; y < (yy+1) * H / div; y++) {
-        //            for (int x = xx * W / div; x < (xx + 1) * W / div; x++) {
-        //                p.x = x;
-        //                p.y = y;
-        //                if (contours.at<uchar>(p) == 255) {
-        //                    d = cfg_.chamfer_trunc - static_cast<double>(dt.at<float>(p));
-        //                    sectorDist += d * d;
-        //                    ++count;
-        //                    ++sectorCount;
-        //                }
-        //            }
+        div = 1;
+        renderer_.render(pose, contours, 3, (float)div);
+        //cv::Point2i p;
+        //cv::Point2i pdt;
+        //int divcorrection = div / 2;
+        //if (div == 1)
+        //    divcorrection = 0;
+        //for (int y = 0; y < H/div; y++) {
+        //    for (int x = 0; x < W/div; x++) {
+        //        p.x = x; pdt.x = x * div + divcorrection;
+        //        p.y = y; pdt.y = y * div + divcorrection;
+        //        if (contours.at<uchar>(p) == 255) {
+        //            //d = cfg_.chamfer_trunc - static_cast<double>(dt.at<float>(pdt));
+        //            d = static_cast<double>(dt.at<float>(pdt));
+        //            sumDist += d;
+        //            ++count;
         //        }
-        //        if (sectorCount >= 200)
-        //            distances.push_back((sectorDist / sectorCount)*(sectorDist / sectorCount));
         //    }
         //}
-        //float sum = std::accumulate(distances.begin(), distances.end(), 0);
-        //result = -sum / distances.size();
+        //result = sumDist / count;
+        auto inertia = computeRadialInertiaDT(dt, contours);
+        result = inertia*(-1);
     }
     else {
         std::cout << "CPU RENDER\n";
@@ -102,7 +192,7 @@ double ContourMatcher::score(const SE3& pose,
         }
         result = -sumDist / count;
     }
-    if (count == 0) return static_cast<double>(cfg_.chamfer_trunc);
+    //if (count == 0) return static_cast<double>(cfg_.chamfer_trunc);
     return result;
 }
 

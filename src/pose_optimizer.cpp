@@ -188,12 +188,14 @@ PoseOptimizer::optimize(const SE3& initPose,
         auto simplex = buildSimplex(x0);
         double min = 0;
         auto minresult = result[0];
-        for (int i = 0; i < 7; ++i) {
+        auto minPoint = simplex[0];
+        /*for (int i = 0; i < 7; ++i) {
             PoseOptimizer::nelderMead(result[i], simplex[i], scoreFn, alpha, gamma, rho, sigma);
             if (result[i].score < minresult.score){
                 minresult = result[i];
+                minPoint = simplex[i];
             }
-        }
+        }*/
         //auto t0 = std::chrono::high_resolution_clock::now();
         //auto ms = [](auto a, auto b) {
         //    return std::chrono::duration<double, std::milli>(b - a).count();
@@ -214,7 +216,7 @@ PoseOptimizer::optimize(const SE3& initPose,
         //std::cout << "[grid] time = " << ms(t0, t1) << "\n";
         //std::cout << "[grid] pose shift: x=" << shift[0] << " y=" << shift[1] << " z=" << shift[2]
         //    << " a=" << shift[3] << " b=" << shift[4] << " c=" << shift[5] << "\n";
-        //PoseOptimizer::nelderMead(minresult, minPose, scoreFn, alpha, gamma, rho, sigma);
+        PoseOptimizer::nelderMead(minresult, x0, scoreFn, alpha, gamma, rho, sigma);
         return minresult;
     }
     std::vector<double> alphaV{0.95, 1.05};
